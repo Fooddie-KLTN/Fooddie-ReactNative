@@ -1,25 +1,32 @@
-// app/register.tsx
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+} from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 
-const RegisterScreen = () => {
+export default function RegisterScreen() {
   const router = useRouter();
-  const { phone } = useLocalSearchParams(); // Lấy số điện thoại từ URL param
+  const { phone } = useLocalSearchParams();
 
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState('');
 
   const handleCreate = () => {
     if (!name || !password || !confirm) {
-      return Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
+      return setError('Vui lòng nhập đầy đủ thông tin');
     }
     if (password !== confirm) {
-      return Alert.alert('Lỗi', 'Mật khẩu không khớp');
+      return setError('Mật khẩu không khớp');
     }
 
-    // Gửi sang màn xác thực OTP, giữ nguyên style route
     router.push({
       pathname: '/verify',
       params: { phone, name, password },
@@ -27,55 +34,81 @@ const RegisterScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <LinearGradient colors={['#9F6508', '#F3C871', '#FFF3B4']} style={styles.container}>
+      <View style={styles.logoContainer}>
+        <Image
+          source={require('../assets/images/logo.png')}
+          style={styles.logo}
+        />
+      </View>
+
       <Text style={styles.title}>Tạo tài khoản mới</Text>
-      <Text style={styles.subtitle}>{phone}</Text>
+      <Text style={styles.subtitle}>Số điện thoại: {phone}</Text>
+
       <TextInput
         placeholder="Tên tài xế"
         style={styles.input}
         value={name}
-        onChangeText={setName}
+        onChangeText={(text) => {
+          setName(text);
+          setError('');
+        }}
       />
       <TextInput
         placeholder="Mật khẩu"
         secureTextEntry
         style={styles.input}
         value={password}
-        onChangeText={setPassword}
+        onChangeText={(text) => {
+          setPassword(text);
+          setError('');
+        }}
       />
       <TextInput
         placeholder="Xác nhận mật khẩu"
         secureTextEntry
         style={styles.input}
         value={confirm}
-        onChangeText={setConfirm}
+        onChangeText={(text) => {
+          setConfirm(text);
+          setError('');
+        }}
       />
+
+      {error !== '' && <Text style={styles.errorText}>{error}</Text>}
+
       <TouchableOpacity style={styles.button} onPress={handleCreate}>
         <Text style={styles.buttonText}>Tạo tài khoản</Text>
       </TouchableOpacity>
-    </View>
+    </LinearGradient>
   );
-};
-
-export default RegisterScreen;
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF3F0',
+    paddingHorizontal: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  logo: {
+    width: 120,
+    height: 120,
+    resizeMode: 'contain',
   },
   title: {
     fontSize: 24,
-    fontWeight: '600',
-    color: '#444',
+    fontWeight: '700',
+    color: '#4A2E00',
   },
   subtitle: {
     fontSize: 16,
     marginBottom: 20,
-    color: '#666',
+    color: '#5f3f0d',
   },
   input: {
     width: '100%',
@@ -88,10 +121,13 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     borderWidth: 1,
   },
+  errorText: {
+    color: '#c62828',
+    marginBottom: 12,
+  },
   button: {
-    backgroundColor: '#FF7043',
+    backgroundColor: '#8D5100',
     paddingVertical: 14,
-    paddingHorizontal: 32,
     borderRadius: 10,
     width: '100%',
     alignItems: 'center',

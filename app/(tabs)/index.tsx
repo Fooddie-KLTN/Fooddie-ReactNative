@@ -3,18 +3,18 @@ import {
   View,
   Text,
   StyleSheet,
-  Alert,
-  TouchableOpacity,
+  Image,
   Switch,
 } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 
-// Hàm tính khoảng cách giữa 2 tọa độ (đơn vị: km)
+// Hàm tính khoảng cách giữa 2 tọa độ (km)
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const toRad = (value: number) => (value * Math.PI) / 180;
-  const R = 6371; // bán kính Trái đất (km)
+  const R = 6371;
 
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
@@ -25,7 +25,7 @@ const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => 
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-  return R * c; // km
+  return R * c;
 };
 
 export default function HomeScreen() {
@@ -33,7 +33,6 @@ export default function HomeScreen() {
   const [user, setUser] = useState<{ name?: string; phone?: string }>({});
   const [online, setOnline] = useState(false);
 
-  // Điểm giả lập: vị trí bắt đầu và kết thúc
   const origin = { latitude: 10.762622, longitude: 106.660172 };
   const destination = { latitude: 10.769, longitude: 106.680 };
 
@@ -56,11 +55,7 @@ export default function HomeScreen() {
         await AsyncStorage.setItem('user', JSON.stringify(newUser));
       } else {
         const saved = await AsyncStorage.getItem('user');
-        if (saved) {
-          setUser(JSON.parse(saved));
-        } else {
-          Alert.alert('Không tìm thấy thông tin', 'Hãy đăng nhập lại!');
-        }
+        if (saved) setUser(JSON.parse(saved));
       }
     };
 
@@ -69,18 +64,36 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.hello}>👋 Xin chào,</Text>
-        <Text style={styles.username}>{user.name || 'Tài xế'}</Text>
-
-        <View style={styles.statusContainer}>
-          <Text style={{ fontWeight: '600', marginRight: 8 }}>
-            {online ? '🟢 Online' : '🔴 Offline'}
+      {/* Header gradient */}
+      <LinearGradient
+        colors={['#9F6508', '#F3C871', '#FFF3B4']}
+        style={styles.header}
+      >
+        <Image
+          source={require('../../assets/images/logo.png')}
+          style={styles.logo}
+        />
+        <View style={styles.statusBox}>
+          <View
+            style={[
+              styles.statusDot,
+              { backgroundColor: online ? '#4CAF50' : '#D32F2F' },
+            ]}
+          />
+          <Text style={styles.statusText}>
+            {online ? 'Đang hoạt động' : 'Ngoại tuyến'}
           </Text>
           <Switch value={online} onValueChange={setOnline} />
         </View>
+      </LinearGradient>
+
+      {/* Info name */}
+      <View style={styles.nameBox}>
+        <Text style={styles.greeting}>Xin chào,</Text>
+        <Text style={styles.name}>{user.name || 'Tài xế'}</Text>
       </View>
 
+      {/* Map */}
       <MapView
         style={styles.map}
         initialRegion={{
@@ -99,12 +112,13 @@ export default function HomeScreen() {
         />
       </MapView>
 
+      {/* Box thông tin */}
       <View style={styles.infoBox}>
-        <Text style={styles.infoText}>
-          📍 Quãng đường: <Text style={styles.bold}>{distance.toFixed(2)} km</Text>
+        <Text style={styles.info}>
+          Quãng đường: <Text style={styles.bold}>{distance.toFixed(2)} km</Text>
         </Text>
-        <Text style={styles.infoText}>
-          💰 Giá cước: <Text style={styles.bold}>{price.toLocaleString()} VND</Text>
+        <Text style={styles.info}>
+          Giá cước: <Text style={styles.bold}>{price.toLocaleString()} VND</Text>
         </Text>
       </View>
     </View>
@@ -112,40 +126,67 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#fff' },
   header: {
-    backgroundColor: '#FFF3E0',
-    paddingHorizontal: 20,
-    paddingTop: 40,
+    paddingTop: 48,
     paddingBottom: 20,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    elevation: 5,
   },
-  hello: {
-    fontSize: 18,
-    color: '#444',
+  logo: {
+    width: 100,
+    height: 100,
+    resizeMode: 'contain',
   },
-  username: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#FF6D00',
-  },
-  statusContainer: {
-    marginTop: 10,
+  statusBox: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
-  map: { flex: 1 },
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  nameBox: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 14,
+  },
+  greeting: {
+    fontSize: 16,
+    color: '#444',
+  },
+  name: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  map: {
+    flex: 1,
+  },
   infoBox: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: '#fff',
     padding: 16,
     alignItems: 'center',
+    borderTopWidth: 1,
+    borderColor: '#eee',
   },
-  infoText: {
+  info: {
     fontSize: 16,
-    marginBottom: 4,
     color: '#444',
+    marginBottom: 4,
   },
   bold: {
     fontWeight: 'bold',
-    color: '#222',
+    color: '#000',
   },
 });

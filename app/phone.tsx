@@ -1,6 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+} from 'react-native';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function PhoneInputScreen() {
   const [phone, setPhone] = useState('');
@@ -8,7 +16,6 @@ export default function PhoneInputScreen() {
 
   const handleNext = () => {
     const hasAccount = parseInt(phone.slice(-1)) % 2 === 0;
-
     if (hasAccount) {
       router.push({ pathname: '/login', params: { phone } });
     } else {
@@ -17,8 +24,16 @@ export default function PhoneInputScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <LinearGradient colors={['#9F6508', '#F3C871', '#FFF3B4']} style={styles.container}>
+      <View style={styles.logoContainer}>
+        <Image
+          source={require('../assets/images/logo.png')}
+          style={styles.logo}
+        />
+      </View>
+
       <Text style={styles.title}>Nhập số điện thoại</Text>
+
       <TextInput
         placeholder="Ví dụ: 0901234567"
         style={styles.input}
@@ -27,6 +42,7 @@ export default function PhoneInputScreen() {
         onChangeText={setPhone}
         maxLength={10}
       />
+
       <TouchableOpacity
         style={[styles.button, phone.length < 9 && { opacity: 0.5 }]}
         onPress={handleNext}
@@ -34,23 +50,31 @@ export default function PhoneInputScreen() {
       >
         <Text style={styles.buttonText}>Tiếp tục</Text>
       </TouchableOpacity>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF5E1',
+    paddingHorizontal: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  logo: {
+    width: 120,
+    height: 120,
+    resizeMode: 'contain',
   },
   title: {
     fontSize: 24,
-    fontWeight: '600',
-    marginBottom: 16,
-    color: '#444',
+    fontWeight: '700',
+    marginBottom: 20,
+    color: '#4A2E00',
   },
   input: {
     width: '100%',
@@ -64,9 +88,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   button: {
-    backgroundColor: '#FF914D',
+    backgroundColor: '#8D5100',
     paddingVertical: 14,
-    paddingHorizontal: 32,
     borderRadius: 10,
     width: '100%',
     alignItems: 'center',

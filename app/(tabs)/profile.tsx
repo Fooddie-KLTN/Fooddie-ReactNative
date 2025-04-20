@@ -2,9 +2,18 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('user');
+      router.replace('/phone'); // đảm bảo có file app/phone.tsx
+    } catch (err) {
+      console.error('Lỗi khi đăng xuất:', err);
+    }
+  };
 
   return (
     <LinearGradient colors={['#9F6508', '#F3C871', '#FFF3B4']} style={styles.container}>
@@ -25,10 +34,10 @@ export default function ProfileScreen() {
         <MenuItem label="Xác minh tài khoản" onPress={() => router.push('/profile/verification')} />
         <MenuItem label="Cài đặt" onPress={() => router.push('/profile/settings')} />
         <MenuItem label="Đổi mật khẩu" onPress={() => router.push('/profile/change-password')} />
-        <MenuItem label="Giới thiệu bạn bè" onPress={() => router.push('/profile/refer-friends')} />
+        <MenuItem label="Giới thiệu bạn bè" onPress={() => router.push('/profile/change-password')} />
       </View>
 
-      <TouchableOpacity style={styles.logoutBtn}>
+      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
         <Text style={styles.logoutText}>Đăng xuất</Text>
       </TouchableOpacity>
     </LinearGradient>
