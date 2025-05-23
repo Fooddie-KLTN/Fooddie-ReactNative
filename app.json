@@ -15,7 +15,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.anonymous.Fooddie"
     },
     "web": {
       "bundler": "metro",
@@ -36,6 +37,15 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "MAPBOX_ACCESS_TOKEN": "env:MAPBOX_ACCESS_TOKEN",
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "bf2aa5cd-75cc-4114-805b-c4898033206a"
+      }
     }
   }
 }
