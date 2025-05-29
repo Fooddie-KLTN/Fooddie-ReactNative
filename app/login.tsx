@@ -6,37 +6,58 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
+  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-
-const mockUsers = [
-  { phone: '0901234567', password: '123456', name: 'Tài xế A' },
-  { phone: '0908551402', password: 'password', name: 'Yoku' },
-];
+import Constants from 'expo-constants';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { phone } = useLocalSearchParams();
+  const { phone } = useLocalSearchParams<{ phone: string }>();
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const apiUrl = Constants.expoConfig?.extra?.apiUrl;
 
   const handleLogin = async () => {
-    const user = mockUsers.find(u => u.phone === phone && u.password === password);
-    if (user) {
-      await AsyncStorage.setItem(
-        'user',
-        JSON.stringify({ name: user.name, phone: user.phone })
-      );
-      router.replace({
-        pathname: '/',
-        params: { name: user.name, phone: user.phone },
+    try {
+      const res = await fetch(`${apiUrl}/auth/login-driver`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: phone, password }),
       });
-    } else {
-      setError('Mật khẩu không đúng. Vui lòng thử lại.');
+  
+      const data = await res.json();
+  
+      if (data.status === 'pending') {
+        Alert.alert('Tài khoản đang chờ duyệt', 'Vui lòng quay lại sau khi được xét duyệt.');
+        return;
+      }
+  
+      if (data.status === 'rejected') {
+        Alert.alert('Tài khoản bị từ chối', 'Vui lòng liên hệ quản trị viên để biết thêm chi tiết.');
+        return;
+      }
+  
+      if (res.ok && data.status === 'approved') {
+        await AsyncStorage.setItem('user', JSON.stringify({
+          id: data.user.id,
+          username: data.user.username,
+          phone: data.user.phone,
+          token: data.access_token,
+        }));
+        router.replace('/');
+      } else {
+        const msg = data.message || 'Đăng nhập thất bại';
+        setError(msg);
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('Đã xảy ra lỗi. Vui lòng thử lại.');
     }
   };
+  
 
   return (
     <LinearGradient colors={['#9F6508', '#F3C871', '#FFF3B4']} style={styles.container}>

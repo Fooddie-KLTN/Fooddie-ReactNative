@@ -6,22 +6,40 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import Constants from 'expo-constants';
+
+
 
 export default function PhoneInputScreen() {
   const [phone, setPhone] = useState('');
   const router = useRouter();
+  const apiUrl = Constants.expoConfig?.extra?.apiUrl;
 
-  const handleNext = () => {
-    const hasAccount = parseInt(phone.slice(-1)) % 2 === 0;
-    if (hasAccount) {
-      router.push({ pathname: '/login', params: { phone } });
-    } else {
-      router.push({ pathname: '/register', params: { phone } });
+
+  const handleNext = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/auth/check-phone?phone=${phone}`);
+      const data = await res.json();
+      console.log('Check phone response:', data);
+  
+      if (data.exists) {
+        if (data.status === 'pending') {
+          Alert.alert('Chờ duyệt', 'Tài khoản của bạn đang chờ được duyệt.');
+          return;
+        }
+        router.push({ pathname: '/login', params: { phone } });
+      } else {
+        router.push({ pathname: '/register', params: { phone } });
+      }
+    } catch (err) {
+      console.error('Error checking phone:', err);
     }
   };
+  
 
   return (
     <LinearGradient colors={['#9F6508', '#F3C871', '#FFF3B4']} style={styles.container}>

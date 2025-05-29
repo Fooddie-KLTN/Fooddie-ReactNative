@@ -41,6 +41,7 @@ export default {
       typedRoutes: true
     },
     extra: {
+      apiUrl: process.env.NEXT_PUBLIC_API_URL,
       MAPBOX_ACCESS_TOKEN: process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN,
       router: {
         origin: false
