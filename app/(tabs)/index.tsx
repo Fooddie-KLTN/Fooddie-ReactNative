@@ -47,46 +47,51 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <Image source={require('../../assets/images/logo.png')} style={styles.logo} />
         <View style={styles.statusBox}>
-          <View style={[
-            styles.statusDot,
-            { backgroundColor: online ? '#4CAF50' : '#D32F2F' }
-          ]} />
+          <View
+            style={[
+              styles.statusDot,
+              { backgroundColor: online ? '#4CAF50' : '#D32F2F' },
+            ]}
+          />
           <Text style={styles.statusText}>
             {online ? 'Đang hoạt động' : 'Ngoại tuyến'}
           </Text>
           <Switch value={online} onValueChange={setOnline} />
         </View>
       </View>
-
+  
       {/* Map */}
-      <MapboxGL.MapView style={styles.map} styleURL={MapboxGL.StyleURL.Street}>
-        <MapboxGL.Camera
-          centerCoordinate={origin}
-          zoomLevel={13}
-        />
-
-        <MapboxGL.PointAnnotation id="origin" coordinate={origin}>
-          <View style={styles.markerOrigin} />
-        </MapboxGL.PointAnnotation>
-
-        <MapboxGL.PointAnnotation id="destination" coordinate={destination}>
-          <View style={styles.markerDest} />
-        </MapboxGL.PointAnnotation>
-
-        {route && (
-          <MapboxGL.ShapeSource id="routeSource" shape={route}>
-            <MapboxGL.LineLayer
-              id="routeLine"
-              style={{
-                lineColor: '#1E90FF',
-                lineWidth: 4,
-                lineCap: 'round',
-                lineJoin: 'round',
-              }}
-            />
-          </MapboxGL.ShapeSource>
-        )}
-      </MapboxGL.MapView>
+      {origin && destination && (
+        <MapboxGL.MapView style={styles.map} styleURL={MapboxGL.StyleURL.Street}>
+          <MapboxGL.Camera centerCoordinate={origin} zoomLevel={13} />
+  
+          {origin && (
+            <MapboxGL.PointAnnotation id="origin" coordinate={origin}>
+              <View style={styles.markerOrigin} />
+            </MapboxGL.PointAnnotation>
+          )}
+  
+          {destination && (
+            <MapboxGL.PointAnnotation id="destination" coordinate={destination}>
+              <View style={styles.markerDest} />
+            </MapboxGL.PointAnnotation>
+          )}
+  
+          {route && route?.type === 'Feature' && (
+            <MapboxGL.ShapeSource id="routeSource" shape={route}>
+              <MapboxGL.LineLayer
+                id="routeLine"
+                style={{
+                  lineColor: '#1E90FF',
+                  lineWidth: 4,
+                  lineCap: 'round',
+                  lineJoin: 'round',
+                }}
+              />
+            </MapboxGL.ShapeSource>
+          )}
+        </MapboxGL.MapView>
+      )}
     </View>
   );
 }
