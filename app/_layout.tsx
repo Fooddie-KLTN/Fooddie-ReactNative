@@ -2,9 +2,13 @@ import { Slot, Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, View } from 'react-native';
+import { ApolloProvider } from '@apollo/client';
+import { apolloClient } from '../src/apollo/apolloClient'; // đường dẫn tùy bạn
+
 
 export default function RootLayout() {
   const [initialRoute, setInitialRoute] = useState<string | null>(null);
+
 
   useEffect(() => {
     const checkState = async () => {
@@ -37,10 +41,9 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <ApolloProvider client={apolloClient}>
       <Redirect href={initialRoute as any} />
-
       <Slot />
-    </>
+    </ApolloProvider>
   );
 }

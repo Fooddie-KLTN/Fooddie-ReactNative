@@ -41,11 +41,11 @@ export default function LoginScreen() {
       }
   
       if (res.ok && data.status === 'approved') {
+        await AsyncStorage.setItem('token', data.access_token); 
         await AsyncStorage.setItem('user', JSON.stringify({
           id: data.user.id,
           username: data.user.username,
           phone: data.user.phone,
-          token: data.access_token,
         }));
         router.replace('/');
       } else {
