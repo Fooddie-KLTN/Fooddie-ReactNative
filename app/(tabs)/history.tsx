@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,39 +11,33 @@ import {
   Pressable,
 } from 'react-native';
 
-const orders = [
-  {
-    id: '1',
-    code: 'ĐH001',
-    address: '123 Lê Lợi',
-    amount: '45.000đ',
-    store: 'Cơm tấm Minh Long',
-    customer: 'Nguyễn Văn A',
-    deliveryTo: '456 Nguyễn Văn Cừ',
-    bill: [
-      { name: 'Cơm sườn', quantity: 1, price: 25000 },
-      { name: 'Nước suối', quantity: 1, price: 10000 },
-    ],
-    shipFee: 10000,
-  },
-  {
-    id: '2',
-    code: 'ĐH002',
-    address: '98 Trần Hưng Đạo',
-    amount: '72.000đ',
-    store: 'Bún bò Huế 3A',
-    customer: 'Trần Thị B',
-    deliveryTo: '25 Nguyễn Thị Minh Khai',
-    bill: [
-      { name: 'Bún bò Huế', quantity: 2, price: 30000 },
-      { name: 'Trà đá', quantity: 2, price: 2000 },
-    ],
-    shipFee: 8000,
-  },
-];
+const apiUrl = Constants.expoConfig?.extra?.apiUrl;
 
 export default function HistoryScreen() {
+  const [orders, setOrders] = useState<any[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+
+
+  // Lấy dữ liệu lịch sử đơn hàng từ API
+  const fetchOrders = async () => {
+    const token = await AsyncStorage.getItem('token');
+    try {
+      const response = await fetch(`${apiUrl}/shippers/order-history?page=1&pageSize=10`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,  // Đảm bảo gửi token xác thực
+        },
+      });
+      const data = await response.json();
+      setOrders(data); // Lưu danh sách đơn hàng vào state
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
 
   const getTotal = (bill: any[], ship: number) =>
     bill.reduce((sum, item) => sum + item.price * item.quantity, 0) + ship;
@@ -56,68 +52,63 @@ export default function HistoryScreen() {
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.card}
-            onPress={() => setSelectedOrder(item)}
+            onPress={() => setSelectedOrder(item)} // Hiển thị chi tiết khi bấm
           >
             <Text style={styles.textBold}>{item.code}</Text>
-            <Text style={styles.address}>{item.address}</Text>
-            <Text style={styles.amount}>{item.amount}</Text>
+            <Text style={styles.address}>{item.address.street}</Text>
+            <Text style={styles.amount}>{item.total.toLocaleString()}đ</Text>
+            <Text style={styles.status}>{item.status}</Text> {/* Hiển thị trạng thái */}
           </TouchableOpacity>
         )}
       />
 
-      {/* Modal chi tiết */}
+      {/* Modal chi tiết đơn hàng */}
       {selectedOrder && (
-  <Modal
-    visible={!!selectedOrder}
-    animationType="slide"
-    transparent
-    onRequestClose={() => setSelectedOrder(null)}
-  >
-    <View style={styles.modalOverlay}>
-      <View style={styles.modalContent}>
-        <Text style={styles.modalTitle}>{selectedOrder.code}</Text>
-        <Text>Cửa hàng: {selectedOrder.store}</Text>
-        <Text>Nơi nhận: {selectedOrder.deliveryTo}</Text>
-        <Text>Khách hàng: {selectedOrder.customer}</Text>
-
-        <Text style={styles.sectionTitle}>Chi tiết món:</Text>
-        {selectedOrder.bill && selectedOrder.bill.map((item: any, idx: number) => (
-          <View key={idx} style={styles.billRow}>
-            <Text>{idx + 1}.</Text>
-            <Text style={{ flex: 1 }}>{item.name}</Text>
-            <Text>{item.quantity}x</Text>
-            <Text>{(item.price * item.quantity).toLocaleString()}đ</Text>
-          </View>
-        ))}
-
-        <View style={styles.billRow}>
-          <Text style={{ flex: 1 }}>Phí ship</Text>
-          <Text>{selectedOrder.shipFee.toLocaleString()}đ</Text>
-        </View>
-
-        <View style={[styles.billRow, { borderTopWidth: 1, paddingTop: 6 }]}>
-          <Text style={{ flex: 1, fontWeight: 'bold' }}>Tổng cộng</Text>
-          <Text style={{ fontWeight: 'bold' }}>
-            {Array.isArray(selectedOrder.bill)
-              ? selectedOrder.bill.reduce(
-                  (sum: number, item: { price: number; quantity: number; }) => sum + item.price * item.quantity,
-                  selectedOrder.shipFee
-                ).toLocaleString()
-              : '0'}đ
-          </Text>
-        </View>
-
-        <Pressable
-          style={styles.closeBtn}
-          onPress={() => setSelectedOrder(null)}
+        <Modal
+          visible={!!selectedOrder}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setSelectedOrder(null)}
         >
-          <Text style={styles.closeText}>Đóng</Text>
-        </Pressable>
-      </View>
-    </View>
-  </Modal>
-)}
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>{selectedOrder.code}</Text>
+              <Text>Cửa hàng: {selectedOrder.restaurant.name}</Text>
+              <Text>Nơi nhận: {selectedOrder.deliveryTo}</Text>
+              <Text>Khách hàng: {selectedOrder.user.name}</Text>
 
+              <Text style={styles.sectionTitle}>Chi tiết món:</Text>
+              {selectedOrder.orderDetails && selectedOrder.orderDetails.map((item: any, idx: number) => (
+                <View key={idx} style={styles.billRow}>
+                  <Text>{idx + 1}.</Text>
+                  <Text style={{ flex: 1 }}>{item.food.name}</Text>
+                  <Text>{item.quantity}x</Text>
+                  <Text>{(item.price * item.quantity).toLocaleString()}đ</Text>
+                </View>
+              ))}
+
+              <View style={styles.billRow}>
+                <Text style={{ flex: 1 }}>Phí ship</Text>
+                <Text>{selectedOrder.shipFee.toLocaleString()}đ</Text>
+              </View>
+
+              <View style={[styles.billRow, { borderTopWidth: 1, paddingTop: 6 }]}>
+                <Text style={{ flex: 1, fontWeight: 'bold' }}>Tổng cộng</Text>
+                <Text style={{ fontWeight: 'bold' }}>
+                  {getTotal(selectedOrder.orderDetails, selectedOrder.shipFee).toLocaleString()}đ
+                </Text>
+              </View>
+
+              <Pressable
+                style={styles.closeBtn}
+                onPress={() => setSelectedOrder(null)}
+              >
+                <Text style={styles.closeText}>Đóng</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -140,6 +131,7 @@ const styles = StyleSheet.create({
   textBold: { fontWeight: '600', fontSize: 16, marginBottom: 4 },
   address: { color: '#555' },
   amount: { color: '#9F6508', fontWeight: '600', marginTop: 6 },
+  status: { color: '#777', marginTop: 6 }, // Hiển thị trạng thái
 
   modalOverlay: {
     flex: 1,

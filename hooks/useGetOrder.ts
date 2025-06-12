@@ -113,7 +113,7 @@ function haversineDistance(
           console.log('[✅ New Order Received]', enrichedOrder);
           setNewOrders(prev => [enrichedOrder, ...prev]);
         } else {
-          console.warn('[⚠️ No new order in payload]');
+          console.log('[⚠️ No new order in payload]');
         }
       },
     });

@@ -12,7 +12,7 @@ const apiUrl = Constants.expoConfig?.extra?.apiUrl;
 console.log('API URL:', apiUrl);
 
 const API_HTTP_URL = `${apiUrl}/graphql`;
-const API_WS_URL = `wss://${backendUrl}/graphql`; 
+const API_WS_URL = `ws://${backendUrl}/graphql`; 
 
 console.log('API_HTTP_URL:', API_HTTP_URL);
 console.log('API_WS_URL:', API_WS_URL);

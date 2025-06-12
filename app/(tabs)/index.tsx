@@ -52,17 +52,18 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const getLocation = async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        console.warn('Permission to access location was denied');
-        return;
-      }
+      // const { status } = await Location.requestForegroundPermissionsAsync();
+      // if (status !== 'granted') {
+      //   console.warn('Permission to access location was denied');
+      //   return;
+      // }
 
-      const location = await Location.getCurrentPositionAsync({});
-      setCurrentPosition([
-        location.coords.longitude,
-        location.coords.latitude,
-      ]);
+      // const location = await Location.getCurrentPositionAsync({});
+      // setCurrentPosition([
+      //   location.coords.longitude,
+      //   location.coords.latitude,
+      // ]);
+      setCurrentPosition([106.660172, 10.762622]);
     };
 
     getLocation();
@@ -75,10 +76,11 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (newOrders.length > 0) {
-      setNewOrder(newOrders[0]);
-      setModalVisible(true);
+      console.log('[📦] New Order:', newOrders[0]); 
+      setNewOrder(newOrders[0]);  
+      setModalVisible(true);  
     }
-  }, [newOrders]);
+  }, [newOrders]); 
 
   useEffect(() => {
     const fetchRoute = async () => {

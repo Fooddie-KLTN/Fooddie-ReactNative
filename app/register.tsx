@@ -61,7 +61,7 @@ export default function RegisterScreen() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.message || 'Đăng ký thất bại');
 
-      router.push('/login');
+      router.push('/phone');
     } catch (err: any) {
       setError(err.message);
     }
