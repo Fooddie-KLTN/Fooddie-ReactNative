@@ -57,7 +57,7 @@ export default function HistoryScreen() {
             <Text style={styles.textBold}>{item.code}</Text>
             <Text style={styles.address}>{item.address.street}</Text>
             <Text style={styles.amount}>{item.total.toLocaleString()}đ</Text>
-            <Text style={styles.status}>{item.status}</Text> {/* Hiển thị trạng thái */}
+            <Text style={styles.status}>{item.status}</Text> 
           </TouchableOpacity>
         )}
       />

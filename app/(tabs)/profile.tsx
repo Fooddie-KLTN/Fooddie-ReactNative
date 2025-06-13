@@ -1,15 +1,48 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+
+const apiUrl = Constants.expoConfig?.extra?.apiUrl;
 
 export default function ProfileScreen() {
   const router = useRouter();
+
+  // State lưu thông tin người dùng
+  const [name, setName] = useState<string>('');
+  const [phone, setPhone] = useState<string>('');
+
+  // Hàm lấy thông tin tài xế
+  const fetchProfile = async () => {
+    const token = await AsyncStorage.getItem('token');
+    try {
+      const res = await fetch(`${apiUrl}/shippers/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setName(data.name || '');
+        setPhone(data.phone || '');
+      } else {
+        Alert.alert('❌ Lỗi', data.message || 'Không thể tải thông tin hồ sơ');
+      }
+    } catch (err) {
+      console.error('Lỗi khi lấy thông tin:', err);
+      Alert.alert('❌ Lỗi', 'Không thể kết nối đến máy chủ');
+    }
+  };
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  // Hàm đăng xuất
   const handleLogout = async () => {
     try {
       await AsyncStorage.removeItem('user');
-      router.replace('/phone'); // đảm bảo có file app/phone.tsx
+      router.replace('/phone'); // Đảm bảo có file app/phone.tsx
     } catch (err) {
       console.error('Lỗi khi đăng xuất:', err);
     }
@@ -19,8 +52,8 @@ export default function ProfileScreen() {
     <LinearGradient colors={['#9F6508', '#F3C871', '#FFF3B4']} style={styles.container}>
       <View style={styles.topSection}>
         <Image source={require('../../assets/images/avatar.jpg')} style={styles.avatar} />
-        <Text style={styles.name}>Trần Văn A</Text>
-        <Text style={styles.phone}>@0901234567</Text>
+        <Text style={styles.name}>{name || 'Không tên'}</Text>
+        <Text style={styles.phone}>{phone || 'Chưa có số điện thoại'}</Text>
 
         <TouchableOpacity
           style={styles.editButton}
