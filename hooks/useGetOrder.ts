@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSubscription } from '@apollo/client';
 import { ORDER_CONFIRMED_FOR_SHIPPERS } from '@/src/graphql/subscriptions/orderSubscription';
+import { router } from 'expo-router';
 
 interface Location {
   latitude: string;
@@ -72,7 +73,7 @@ function haversineDistance(
 
   export function useOrderConfirmedForShipper(
     location: Location,
-    maxDistance: number = 5,
+    maxDistance: number = 9999,
     enable: boolean = false
   ) {
     const [newOrders, setNewOrders] = useState<Order[]>([]);
@@ -118,9 +119,12 @@ function haversineDistance(
       },
     });
   
-    if (error) {
-      console.error('[❌ Subscription Error]', error);
-    }
+    useEffect(() => {
+      if (error) {
+        console.error('[❌ Subscription Error]', error);
+        router.push('/phone');
+      }
+    }, [error]);
   
     return {
       newOrders,

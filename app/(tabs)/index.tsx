@@ -72,7 +72,7 @@ export default function HomeScreen() {
   const { newOrders } = useOrderConfirmedForShipper({
     latitude: currentPosition?.[1]?.toString() || '',
     longitude: currentPosition?.[0]?.toString() || '',
-  }, 5, online);
+  }, 9999, online);
 
   useEffect(() => {
     if (newOrders.length > 0) {
