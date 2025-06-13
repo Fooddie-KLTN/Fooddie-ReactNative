@@ -113,7 +113,7 @@ export default function HomeScreen() {
         return;
       }
 
-      const res = await fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/request-order`, {
+      const res = await fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/accept-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -155,13 +155,40 @@ export default function HomeScreen() {
     }
   };
 
-  const handleCompleteOrder = () => {
-    Alert.alert('✅ Đơn hoàn thành', 'Bạn đã giao đơn thành công!');
-    setNewOrder(null);
-    setRoute(null);
-    setHasPickedUp(false);
-    setOnline(true); // chuyển lại online
+  const handleCompleteOrder = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        Alert.alert('❌ Token không hợp lệ', 'Vui lòng đăng nhập lại.');
+        return;
+      }
+  
+      const res = await fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/complete-order`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ orderId: newOrder.id }),
+      });
+  
+      const result = await res.json();
+  
+      if (res.ok) {
+        Alert.alert('✅ Đơn hoàn thành', 'Bạn đã giao đơn thành công!');
+        setNewOrder(null);
+        setRoute(null);
+        setHasPickedUp(false);
+        setOnline(true); // Cho phép nhận đơn tiếp theo
+      } else {
+        Alert.alert('❌ Lỗi', result.message || 'Không thể hoàn thành đơn hàng');
+      }
+    } catch (err) {
+      console.error('Complete order error:', err);
+      Alert.alert('❌ Lỗi', 'Đã xảy ra lỗi khi hoàn thành đơn hàng');
+    }
   };
+  
 
   const handleCancelOrder = () => {
     Alert.alert('🚫 Huỷ đơn', 'Bạn đã huỷ đơn này');
