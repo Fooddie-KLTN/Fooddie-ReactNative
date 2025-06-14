@@ -5,11 +5,13 @@ export const ORDER_CONFIRMED_FOR_SHIPPERS = gql`
     $latitude: String!
     $longitude: String!
     $maxDistance: Float
+    $shipperId: String!
   ) {
     orderConfirmedForShippers(
       latitude: $latitude
       longitude: $longitude
       maxDistance: $maxDistance
+      shipperId: $shipperId
     ) {
       id
       status

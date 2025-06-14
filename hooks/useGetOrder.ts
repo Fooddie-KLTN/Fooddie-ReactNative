@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSubscription } from '@apollo/client';
 import { ORDER_CONFIRMED_FOR_SHIPPERS } from '@/src/graphql/subscriptions/orderSubscription';
 import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Location {
   latitude: string;
@@ -77,40 +78,62 @@ function haversineDistance(
     enable: boolean = false
   ) {
     const [newOrders, setNewOrders] = useState<Order[]>([]);
-  
+    const [shipperId, setShipperId] = useState<string>('');
+
+    // Get shipperId from AsyncStorage
+    useEffect(() => {
+      const getShipperId = async () => {
+        try {
+          const userStr = await AsyncStorage.getItem('user');
+          if (userStr) {
+            const user = JSON.parse(userStr);
+            setShipperId(user.id);
+          }
+        } catch (error) {
+          console.error('Error getting shipperId:', error);
+        }
+      };
+      
+      if (enable) {
+        getShipperId();
+      }
+    }, [enable]);
+
     console.log('[📍 useOrderConfirmedForShipper] Location:', location);
     console.log('[🚦 useOrderConfirmedForShipper] Enabled:', enable);
-  
+    console.log('[👤 useOrderConfirmedForShipper] ShipperId:', shipperId);
+
     const { loading, error } = useSubscription(ORDER_CONFIRMED_FOR_SHIPPERS, {
       variables: {
         latitude: location.latitude,
         longitude: location.longitude,
         maxDistance,
+        shipperId,
       },
-      skip: !enable || !location.latitude || !location.longitude,
+      skip: !enable || !location.latitude || !location.longitude || !shipperId,
       onData: ({ data }) => {
         console.log('[📡 Subscription Triggered] Raw data:', data);
-  
+
         const newOrder = data?.data?.orderConfirmedForShippers;
         console.log('[📦 Order received]', newOrder?.address);
         console.log('[📍 Lat/Lng]', newOrder?.address.latitude, newOrder?.address.longitude);
-  
+
         if (newOrder) {
           const orderLat = parseFloat(newOrder.address.latitude);
           const orderLon = parseFloat(newOrder.address.longitude);
           const shipperLat = parseFloat(location.latitude);
           const shipperLon = parseFloat(location.longitude);
-  
+
           const distance = haversineDistance(
             { lat: shipperLat, lon: shipperLon },
             { lat: orderLat, lon: orderLon }
           );
-  
+
           const enrichedOrder: Order = {
             ...newOrder,
             distanceFromShipper: distance,
           };
-  
+
           console.log('[✅ New Order Received]', enrichedOrder);
           setNewOrders(prev => [enrichedOrder, ...prev]);
         } else {
@@ -118,14 +141,14 @@ function haversineDistance(
         }
       },
     });
-  
+
     useEffect(() => {
       if (error) {
         console.error('[❌ Subscription Error]', error);
         router.push('/phone');
       }
     }, [error]);
-  
+
     return {
       newOrders,
       loading,
