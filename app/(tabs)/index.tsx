@@ -29,11 +29,12 @@ export default function HomeScreen() {
   const [hasPickedUp, setHasPickedUp] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
 
-
   const cameraRef = useRef<MapboxGL.Camera>(null);
   const pulseAnim = useRef(new Animated.Value(0)).current;
+  const locationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
@@ -68,6 +69,59 @@ export default function HomeScreen() {
 
     getLocation();
   }, []);
+
+
+  useEffect(() => {
+  console.log('[DEBUG] useEffect locationInterval: newOrder =', newOrder, ', hasPickedUp =', hasPickedUp, ', currentPosition =', currentPosition);
+
+  // Start interval only when delivering (hasPickedUp) and there is a newOrder
+  if (newOrder) {
+    if (locationIntervalRef.current) clearInterval(locationIntervalRef.current);
+
+    locationIntervalRef.current = setInterval(async () => {
+      try {
+        // Use real location if needed, here using currentPosition state
+        const latitude = currentPosition?.[1];
+        const longitude = currentPosition?.[0];
+
+        console.log('[DEBUG] Interval tick: latitude =', latitude, ', longitude =', longitude);
+
+        if (latitude && longitude) {
+          const token = await AsyncStorage.getItem('token');
+          console.log('[🚚] Posting location to BE:', { latitude, longitude });
+          await fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/update-location`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ latitude, longitude }),
+          });
+        } else {
+          console.log('[🚚] Skipped posting location: missing coordinates');
+        }
+      } catch (err) {
+        console.warn('[🚚] Failed to update location:', err);
+      }
+    }, 5000);
+  } else {
+    console.log('[DEBUG] Not starting locationInterval: hasPickedUp is false');
+    if (locationIntervalRef.current) {
+      clearInterval(locationIntervalRef.current);
+      locationIntervalRef.current = null;
+      console.log('[DEBUG] Cleared locationInterval');
+    }
+  }
+
+  // Cleanup on unmount or when dependencies change
+  return () => {
+    if (locationIntervalRef.current) {
+      clearInterval(locationIntervalRef.current);
+      locationIntervalRef.current = null;
+      console.log('[DEBUG] Cleanup: Cleared locationInterval');
+    }
+  };
+}, [newOrder, hasPickedUp, currentPosition]);
 
   const { newOrders } = useOrderConfirmedForShipper({
     latitude: currentPosition?.[1]?.toString() || '',
