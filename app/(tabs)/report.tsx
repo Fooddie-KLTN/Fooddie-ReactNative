@@ -6,8 +6,9 @@ import {
   Dimensions,
   ScrollView,
   TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
-import { BarChart, PieChart } from 'react-native-chart-kit';
+import { BarChart, PieChart, LineChart } from 'react-native-chart-kit';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
@@ -15,17 +16,66 @@ import { Picker } from '@react-native-picker/picker';
 const screenWidth = Dimensions.get('window').width;
 const apiUrl = Constants.expoConfig?.extra?.apiUrl;
 
+interface ReportData {
+  period: string;
+  dateRange: {
+    from: string;
+    to: string;
+  };
+  labels: string[];
+  data: {
+    earnings: number[];
+    deliveryCount: number[];
+    avgEarningsPerDelivery: number[];
+  };
+  summary: {
+    totalEarnings: number;
+    totalDeliveries: number;
+    avgEarningsPerDelivery: number;
+    bestDay: {
+      date: string;
+      earnings: number;
+      deliveries: number;
+    };
+    worstDay: {
+      date: string;
+      earnings: number;
+    };
+    formatted: {
+      totalEarnings: string;
+      avgEarningsPerDelivery: string;
+      avgEarningsPerDay: string;
+    };
+  };
+  analytics: {
+    peakPerformanceDays: string[];
+    consistency: number;
+    trend: string;
+    workloadDistribution: {
+      lightDays: number;
+      moderateDays: number;
+      heavyDays: number;
+    };
+  };
+}
+
 export default function ReportScreen() {
   const [filter, setFilter] = useState<'today' | 'week' | 'month'>('week');
-  const [chartType, setChartType] = useState<'bar' | 'pie'>('bar');
-  const [labels, setLabels] = useState<string[]>([]);
-  const [data, setData] = useState<number[]>([]);
-  const [total, setTotal] = useState<number>(0);
+  const [chartType, setChartType] = useState<'earnings' | 'deliveries' | 'average'>('earnings');
+  const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const now = new Date();
-  const [month, setMonth] = useState(now.getMonth() + 1); // 1-12
+  const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
 
-  const fetchData = async () => {
+  const fetchData = async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
     const token = await AsyncStorage.getItem('token');
     try {
       const url = new URL(`${apiUrl}/shippers/income-report`);
@@ -38,12 +88,19 @@ export default function ReportScreen() {
       const res = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const json = await res.json();
-      setLabels(json.labels || []);
-      setData(json.data || []);
-      setTotal(json.total || 0);
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      
+      const data = await res.json();
+      setReportData(data);
     } catch (err) {
       console.error('⚠️ Failed to fetch income report:', err);
+      setReportData(null);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -51,36 +108,96 @@ export default function ReportScreen() {
     fetchData();
   }, [filter, month, year]);
 
-  const pieData = data.length > 0
-  ? data.map((value, index) => ({
-      name: labels[index],
+  const onRefresh = () => {
+    fetchData(true);
+  };
+
+  const getChartData = () => {
+    if (!reportData) return { labels: [], datasets: [{ data: [] }] };
+
+    let data: number[];
+    switch (chartType) {
+      case 'deliveries':
+        data = reportData.data.deliveryCount;
+        break;
+      case 'average':
+        data = reportData.data.avgEarningsPerDelivery;
+        break;
+      default:
+        data = reportData.data.earnings;
+    }
+
+    return {
+      labels: reportData.labels,
+      datasets: [{ data: data.length > 0 ? data : [0] }]
+    };
+  };
+
+  const getPieData = () => {
+    if (!reportData || reportData.data.earnings.length === 0) return [];
+
+    return reportData.data.earnings.map((value, index) => ({
+      name: reportData.labels[index],
       population: value,
       color: ['#F47C48', '#FDCB6E', '#FF9F43', '#FF6D3F', '#FF8A65', '#FFA726', '#FF7043'][index % 7],
       legendFontColor: '#333',
       legendFontSize: 12,
-    }))
-  : [];
+    })).filter(item => item.population > 0);
+  };
+
+  const getTrendColor = (trend: string) => {
+    switch (trend) {
+      case 'improving': return '#4CAF50';
+      case 'declining': return '#F44336';
+      case 'stable': return '#FF9800';
+      default: return '#999';
+    }
+  };
+
+  const getTrendIcon = (trend: string) => {
+    switch (trend) {
+      case 'improving': return '📈';
+      case 'declining': return '📉';
+      case 'stable': return '➡️';
+      default: return '❓';
+    }
+  };
 
   const chartConfig = {
     backgroundGradientFrom: '#FFFDF4',
     backgroundGradientTo: '#FFFDF4',
     decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(255, 111, 0, ${opacity})`,
+    color: (opacity = 1) => {
+      switch (chartType) {
+        case 'deliveries': return `rgba(76, 175, 80, ${opacity})`;
+        case 'average': return `rgba(156, 39, 176, ${opacity})`;
+        default: return `rgba(255, 111, 0, ${opacity})`;
+      }
+    },
     labelColor: () => '#4A2E00',
     barPercentage: 0.6,
     style: { borderRadius: 12 },
   };
 
+  const formatCurrency = (amount: number) => {
+    return `${amount.toLocaleString('vi-VN')}đ`;
+  };
+
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView 
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       <Text style={styles.header}>📊 Báo cáo thu nhập</Text>
 
       {/* Bộ lọc thời gian */}
       <View style={styles.filterRow}>
-        {['today', 'week', 'month'].map((key) => (
+        {(['today', 'week', 'month'] as const).map((key) => (
           <TouchableOpacity
             key={key}
-            onPress={() => setFilter(key as any)}
+            onPress={() => setFilter(key)}
             style={[styles.filterButton, filter === key && styles.filterButtonActive]}
           >
             <Text style={filter === key ? styles.filterTextActive : styles.filterText}>
@@ -112,58 +229,55 @@ export default function ReportScreen() {
         </View>
       )}
 
-      {/* Chuyển loại biểu đồ */}
-      <View style={styles.toggleRow}>
-        <TouchableOpacity
-          onPress={() => setChartType('bar')}
-          style={[styles.toggleBtn, chartType === 'bar' && styles.toggleBtnActive]}
-        >
-          <Text style={chartType === 'bar' ? styles.toggleTextActive : styles.toggleText}>Biểu đồ cột</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setChartType('pie')}
-          style={[styles.toggleBtn, chartType === 'pie' && styles.toggleBtnActive]}
-        >
-          <Text style={chartType === 'pie' ? styles.toggleTextActive : styles.toggleText}>Biểu đồ tròn</Text>
-        </TouchableOpacity>
-      </View>
+      {loading ? (
+        <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
+      ) : reportData ? (
+        <>
+          {/* Tổng thu nhập */}
+          <View style={styles.box}>
+            <Text style={styles.label}>Tổng {filter === 'today' ? 'hôm nay' : filter === 'week' ? 'tuần này' : `tháng ${month}/${year}`}:</Text>
+            <Text style={styles.amount}>{reportData.summary.formatted.totalEarnings}</Text>
+          </View>
 
-      {/* Tổng thu nhập */}
-      <View style={styles.box}>
-        <Text style={styles.label}>Tổng {filter === 'today' ? 'hôm nay' : filter === 'week' ? 'tuần này' : `tháng ${month}/${year}`}:</Text>
-        <Text style={styles.amount}>{total.toLocaleString()}đ</Text>
-      </View>
+          {/* Biểu đồ loại cột hoặc đường */}
+          {reportData.data.earnings.length > 0 ? (
+            <BarChart
+              data={getChartData()}
+              width={screenWidth - 32}
+              height={250}
+              yAxisLabel=""
+              yAxisSuffix={chartType === 'deliveries' ? '' : 'đ'}
+              chartConfig={chartConfig}
+              showValuesOnTopOfBars
+              verticalLabelRotation={0}
+              style={styles.chart}
+            />
+          ) : (
+            <Text style={styles.noDataText}>
+              Không có dữ liệu để hiển thị trong khoảng thời gian này
+            </Text>
+          )}
 
-      {/* Biểu đồ */}
-      {chartType === 'bar' && data.length > 0 ? (
-        <BarChart
-          data={{
-            labels: labels,
-            datasets: [{ data }],
-          }}
-          width={screenWidth - 32}
-          height={250}
-          yAxisLabel=""
-          yAxisSuffix="đ"
-          chartConfig={chartConfig}
-          showValuesOnTopOfBars
-          verticalLabelRotation={0}
-          style={styles.chart}
-        />
-        ) : chartType === 'pie' && data.length > 0 ? (
-        <PieChart
-          data={pieData}
-          width={screenWidth - 32}
-          height={250}
-          chartConfig={chartConfig}
-          accessor="population"
-          backgroundColor="transparent"
-          paddingLeft="12"
-          style={styles.chart}
-        />
+          {/* Biểu đồ tròn cho phân bố thu nhập */}
+          {reportData.data.earnings.length > 0 && getPieData().length > 0 && (
+            <>
+              <Text style={styles.pieChartTitle}>📈 Phân bố thu nhập theo ngày</Text>
+              <PieChart
+                data={getPieData()}
+                width={screenWidth - 32}
+                height={220}
+                chartConfig={chartConfig}
+                accessor="population"
+                backgroundColor="transparent"
+                paddingLeft="15"
+                style={styles.chart}
+              />
+            </>
+          )}
+        </>
       ) : (
-        <Text style={{ textAlign: 'center', marginTop: 20, color: '#999' }}>
-          Không có dữ liệu để hiển thị
+        <Text style={styles.noDataText}>
+          Không thể tải dữ liệu báo cáo. Vui lòng thử lại.
         </Text>
       )}
     </ScrollView>
@@ -171,8 +285,31 @@ export default function ReportScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFDF4', padding: 16 },
-  header: { fontSize: 20, fontWeight: '700', color: '#4A2E00', marginBottom: 20 },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#FFFDF4', 
+    padding: 16 
+  },
+  header: { 
+    fontSize: 20, 
+    fontWeight: '700', 
+    color: '#4A2E00', 
+    marginBottom: 20,
+    textAlign: 'center'
+  },
+  loadingText: {
+    textAlign: 'center',
+    marginTop: 50,
+    fontSize: 16,
+    color: '#666'
+  },
+  noDataText: {
+    textAlign: 'center',
+    marginTop: 20,
+    color: '#999',
+    fontSize: 16,
+    fontStyle: 'italic'
+  },
 
   box: {
     backgroundColor: '#FFEEC8',
@@ -183,9 +320,127 @@ const styles = StyleSheet.create({
   label: { fontSize: 16, color: '#6A4A00' },
   amount: { fontSize: 22, fontWeight: 'bold', color: '#9F6508', marginTop: 6 },
 
-  chart: { borderRadius: 16 },
+  chart: { 
+    borderRadius: 16,
+    marginVertical: 16,
+  },
+  pieChartTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4A2E00',
+    textAlign: 'center',
+    marginTop: 20,
+    marginBottom: 8,
+  },
 
-  filterRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
+  // Summary Cards
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    gap: 8,
+  },
+  summaryCard: {
+    flex: 1,
+    backgroundColor: '#FFEEC8',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  summaryLabel: { 
+    fontSize: 14, 
+    color: '#6A4A00',
+    marginBottom: 4,
+  },
+  summaryValue: { 
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    color: '#9F6508',
+  },
+
+  // Analytics
+  analyticsContainer: {
+    marginBottom: 16,
+  },
+  analyticsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FFD580',
+  },
+  analyticsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4A2E00',
+    marginBottom: 12,
+  },
+  analyticsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  analyticsLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  analyticsValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  workloadTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#4A2E00',
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  workloadContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  workloadItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  workloadLabel: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+  },
+  workloadValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#9F6508',
+  },
+
+  // Best Day
+  bestDayContainer: {
+    alignItems: 'center',
+  },
+  bestDayLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  bestDayValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4A2E00',
+    marginVertical: 4,
+  },
+  bestDayEarnings: {
+    fontSize: 14,
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+
+  filterRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    marginBottom: 16 
+  },
   filterButton: {
     flex: 1,
     padding: 10,
@@ -200,18 +455,23 @@ const styles = StyleSheet.create({
   filterText: { color: '#444' },
   filterTextActive: { color: '#000', fontWeight: 'bold' },
 
-  toggleRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 12 },
-  toggleBtn: {
-    padding: 10,
+  chartTypeRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    marginBottom: 16 
+  },
+  chartTypeBtn: {
+    flex: 1,
+    padding: 8,
+    marginHorizontal: 2,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#FFD580',
-    width: '45%',
     alignItems: 'center',
   },
-  toggleBtnActive: { backgroundColor: '#FFD580' },
-  toggleText: { color: '#444' },
-  toggleTextActive: { fontWeight: 'bold', color: '#000' },
+  chartTypeBtnActive: { backgroundColor: '#FFD580' },
+  chartTypeText: { color: '#444', fontSize: 12 },
+  chartTypeTextActive: { fontWeight: 'bold', color: '#000', fontSize: 12 },
 
   pickerRow: {
     flexDirection: 'row',
