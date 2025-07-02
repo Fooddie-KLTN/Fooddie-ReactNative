@@ -13,6 +13,13 @@ export interface Order {
   id: string;
   status: string;
   total: number;
+  shippingFee?: number;
+  shipperEarnings?: number;
+  shipperCommissionRate?: number;
+  deliveryDistance?: number;
+  estimatedDeliveryTime?: number;
+  deliveryType?: string;
+  requestedDeliveryTime?: string;
   restaurant: {
     id: string;
     name: string;
@@ -117,6 +124,7 @@ function haversineDistance(
         const newOrder = data?.data?.orderConfirmedForShippers;
         console.log('[📦 Order received]', newOrder?.address);
         console.log('[📍 Lat/Lng]', newOrder?.address.latitude, newOrder?.address.longitude);
+        console.log('[💰 Earnings Info]', newOrder?.deliveryMetadata?.shippingInfo?.financialSummary);
 
         if (newOrder) {
           const orderLat = parseFloat(newOrder.address.latitude);
@@ -135,6 +143,7 @@ function haversineDistance(
           };
 
           console.log('[✅ New Order Received]', enrichedOrder);
+          
           setNewOrders(prev => [enrichedOrder, ...prev]);
         } else {
           console.log('[⚠️ No new order in payload]');

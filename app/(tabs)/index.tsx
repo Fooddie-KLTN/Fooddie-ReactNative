@@ -28,6 +28,7 @@ export default function HomeScreen() {
   const [destination, setDestination] = useState<[number, number] | null>(null);
   const [hasPickedUp, setHasPickedUp] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [orderReceivedAt, setOrderReceivedAt] = useState<Date | null>(null);
 
   const cameraRef = useRef<MapboxGL.Camera>(null);
   const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -132,7 +133,8 @@ export default function HomeScreen() {
     if (newOrders.length > 0) {
       console.log('[📦] New Order:', newOrders[0]); 
       setNewOrder(newOrders[0]);  
-      setModalVisible(true);  
+      setModalVisible(true);
+      setOrderReceivedAt(new Date()); // Track when order was received
     }
   }, [newOrders]); 
 
@@ -167,13 +169,23 @@ export default function HomeScreen() {
         return;
       }
 
+      // Calculate actual response time
+      const responseTimeSeconds = orderReceivedAt 
+        ? Math.floor((new Date().getTime() - orderReceivedAt.getTime()) / 1000)
+        : 30;
+
+      console.log('[✅] Accepting order:', newOrder?.id, 'Response time:', responseTimeSeconds, 'seconds');
+
       const res = await fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/accept-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ orderId: newOrder.id }),
+        body: JSON.stringify({ 
+          orderId: newOrder.id,
+          responseTimeSeconds 
+        }),
       });
 
       const result = await res.json();
@@ -181,6 +193,7 @@ export default function HomeScreen() {
       if (res.ok) {
         setModalVisible(false);
         setOnline(false); // chuyển trạng thái offline
+        setOrderReceivedAt(null); // Clear the timestamp
         const { latitude, longitude } = newOrder.restaurant;
         if (latitude && longitude) {
           setDestination([parseFloat(longitude), parseFloat(latitude)]);
@@ -194,8 +207,54 @@ export default function HomeScreen() {
     }
   };
 
-  const handleRejectOrder = () => {
-    setModalVisible(false);
+  const handleRejectOrder = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        Alert.alert('❌ Token không hợp lệ', 'Vui lòng đăng nhập lại.');
+        return;
+      }
+
+      // Calculate actual response time
+      const responseTimeSeconds = orderReceivedAt 
+        ? Math.floor((new Date().getTime() - orderReceivedAt.getTime()) / 1000)
+        : 30;
+
+      console.log('[🚫] Rejecting order:', newOrder?.id, 'Response time:', responseTimeSeconds, 'seconds');
+
+      const res = await fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/reject-order`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          orderId: newOrder.id,
+          responseTimeSeconds 
+        }),
+      });
+
+      const result = await res.json();
+
+      if (res.ok) {
+        Alert.alert('🚫 Từ chối đơn', 'Bạn đã từ chối đơn hàng này');
+        setModalVisible(false);
+        setNewOrder(null);
+        setOrderReceivedAt(null);
+        
+        // Show warning if present in response
+        if (result.warning) {
+          setTimeout(() => {
+            Alert.alert('⚠️ Cảnh báo', result.warning);
+          }, 1000);
+        }
+      } else {
+        Alert.alert('❌ Lỗi', result.message || 'Không thể từ chối đơn hàng');
+      }
+    } catch (error) {
+      console.error('Reject order error:', error);
+      Alert.alert('❌ Lỗi', 'Có lỗi xảy ra khi từ chối đơn hàng');
+    }
   };
 
   const handlePickup = () => {
@@ -472,7 +531,7 @@ export default function HomeScreen() {
               <Text style={styles.modalTitle}>🚨 Đơn hàng mới</Text>
             </View>
 
-            <View style={styles.modalContent}>
+            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
               <Text style={styles.label}>
                 🏪 Từ: <Text style={styles.value}>{newOrder?.restaurant?.name || 'Không rõ'}</Text>
               </Text>
@@ -492,12 +551,99 @@ export default function HomeScreen() {
               </Text>
 
               <Text style={styles.label}>
+                🚚 Phí ship:{' '}
+                <Text style={styles.value}>
+                  {(newOrder?.shippingFee || 0).toLocaleString()}đ
+                </Text>
+              </Text>
+
+              <Text style={styles.label}>
+                💵 Thu nhập:{' '}
+                <Text style={[styles.value, { color: '#4CAF50', fontWeight: 'bold' }]}>
+                  {(newOrder?.shipperEarnings || 0).toLocaleString()}đ
+                </Text>
+              </Text>
+
+              <Text style={styles.label}>
                 📏 Cách bạn:{' '}
                 <Text style={styles.value}>
                   {newOrder?.distanceFromShipper?.toFixed(2) || '–'} km
                 </Text>
               </Text>
-            </View>
+
+              <Text style={styles.label}>
+                📦 Khoảng cách giao:{' '}
+                <Text style={styles.value}>
+                  {(newOrder?.deliveryDistance || 0).toFixed(2)} km
+                </Text>
+              </Text>
+
+              <Text style={styles.label}>
+                ⏱️ Thời gian dự kiến:{' '}
+                <Text style={styles.value}>
+                  {newOrder?.estimatedDeliveryTime || 30} phút
+                </Text>
+              </Text>
+
+              {/* Add basic financial calculations */}
+              {newOrder?.shippingFee && newOrder?.shipperEarnings && (
+                <>
+                  <View style={styles.separator} />
+                  <Text style={[styles.label, { fontSize: 16, color: '#2196F3' }]}>💰 Chi tiết thu nhập:</Text>
+                  
+                  <Text style={styles.label}>
+                    💳 Thu nhập gộp:{' '}
+                    <Text style={styles.value}>
+                      {newOrder.shipperEarnings.toLocaleString()}đ
+                    </Text>
+                  </Text>
+
+                  <Text style={styles.label}>
+                    ⛽ Chi phí xăng dự kiến:{' '}
+                    <Text style={styles.value}>
+                      {Math.round((newOrder.deliveryDistance || 0) * 3000).toLocaleString()}đ
+                    </Text>
+                  </Text>
+
+                  <Text style={styles.label}>
+                    💚 Lợi nhuận ròng:{' '}
+                    <Text style={[styles.value, { 
+                      color: newOrder.shipperEarnings > ((newOrder.deliveryDistance || 0) * 3000) ? '#4CAF50' : '#F44336',
+                      fontWeight: 'bold' 
+                    }]}>
+                      {Math.max(0, newOrder.shipperEarnings - ((newOrder.deliveryDistance || 0) * 3000)).toLocaleString()}đ
+                    </Text>
+                  </Text>
+
+                  <Text style={styles.label}>
+                    🛣️ Thu nhập/km:{' '}
+                    <Text style={styles.value}>
+                      {newOrder.deliveryDistance > 0 ? Math.round(newOrder.shipperEarnings / newOrder.deliveryDistance).toLocaleString() : 0}đ/km
+                    </Text>
+                  </Text>
+                </>
+              )}
+
+              {/* Delivery Details */}
+              <View style={styles.separator} />
+              <Text style={[styles.label, { fontSize: 16, color: '#FF9800' }]}>🚚 Thông tin giao hàng:</Text>
+              
+              <Text style={styles.label}>
+                📦 Loại giao hàng:{' '}
+                <Text style={styles.value}>
+                  {newOrder?.deliveryType === 'scheduled' ? 'Đặt trước' : 'Giao ngay'}
+                </Text>
+              </Text>
+
+              {newOrder?.requestedDeliveryTime && (
+                <Text style={styles.label}>
+                  🕒 Yêu cầu giao lúc:{' '}
+                  <Text style={styles.value}>
+                    {newOrder.requestedDeliveryTime}
+                  </Text>
+                </Text>
+              )}
+            </ScrollView>
 
             <View style={styles.buttonGroup}>
               <TouchableOpacity style={styles.rejectBtn} onPress={handleRejectOrder}>
@@ -662,5 +808,10 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     backgroundColor: '#fff',
-  }
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#E0E0E0',
+    marginVertical: 12,
+  },
 });

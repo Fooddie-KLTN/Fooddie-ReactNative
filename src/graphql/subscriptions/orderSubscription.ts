@@ -16,6 +16,13 @@ export const ORDER_CONFIRMED_FOR_SHIPPERS = gql`
       id
       status
       total
+      shippingFee
+      shipperEarnings
+      shipperCommissionRate
+      deliveryDistance
+      estimatedDeliveryTime
+      deliveryType
+      requestedDeliveryTime
       restaurant {
         id
         name
@@ -28,7 +35,6 @@ export const ORDER_CONFIRMED_FOR_SHIPPERS = gql`
           city
         }
       }
-      
       user {
         id
         name
