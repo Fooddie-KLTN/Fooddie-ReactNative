@@ -190,7 +190,7 @@ export default function ReportScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      <Text style={styles.header}>📊 Báo cáo thu nhập</Text>
+      <Text style={styles.header}>📊 Thống kê thu nhập</Text>
 
       {/* Bộ lọc thời gian */}
       <View style={styles.filterRow}>
