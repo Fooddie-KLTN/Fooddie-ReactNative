@@ -54,18 +54,18 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const getLocation = async () => {
-      // const { status } = await Location.requestForegroundPermissionsAsync();
-      // if (status !== 'granted') {
-      //   console.warn('Permission to access location was denied');
-      //   return;
-      // }
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.warn('Permission to access location was denied');
+        return;
+      }
 
-      // const location = await Location.getCurrentPositionAsync({});
-      // setCurrentPosition([
-      //   location.coords.longitude,
-      //   location.coords.latitude,
-      // ]);
-      setCurrentPosition([106.660172, 10.762622]);
+      const location = await Location.getCurrentPositionAsync({});
+      setCurrentPosition([
+        location.coords.longitude,
+        location.coords.latitude,
+      ]);
+      //setCurrentPosition([106.660172, 10.762622]);
     };
 
     getLocation();
@@ -259,7 +259,31 @@ export default function HomeScreen() {
 
   const handlePickup = () => {
     setHasPickedUp(true);
-    Alert.alert('✅ Đã lấy món từ nhà hàng');
+
+    try {
+      const token = AsyncStorage.getItem('token');
+      if (!token) {
+        Alert.alert('❌ Token không hợp lệ', 'Vui lòng đăng nhập lại.');
+        return;
+      }
+
+      fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/get-order`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ orderId: newOrder.id }),
+      });
+
+          Alert.alert('✅ Đã lấy món từ nhà hàng');
+
+    } catch (error) {
+      console.error('Pickup error:', error);
+      Alert.alert('❌ Lỗi', 'Đã xảy ra lỗi khi lấy món từ nhà hàng');
+    }
+
+
 
     const lat = parseFloat(newOrder.address.latitude);
     const lon = parseFloat(newOrder.address.longitude);
@@ -304,7 +328,33 @@ export default function HomeScreen() {
   
 
   const handleCancelOrder = () => {
+
+    try {
+      const token = AsyncStorage.getItem('token');
+      if (!token) {
+        Alert.alert('❌ Token không hợp lệ', 'Vui lòng đăng nhập lại.');
+        return;
+      }
+
+      fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/cancel-order`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ orderId: newOrder.id }),
+      });
     Alert.alert('🚫 Huỷ đơn', 'Bạn đã huỷ đơn này');
+
+
+
+
+    }
+    catch (error) {
+      console.error('Cancel order error:', error);
+      Alert.alert('❌ Lỗi', 'Đã xảy ra lỗi khi huỷ đơn hàng');
+    }
+
     setNewOrder(null);
     setRoute(null);
     setOnline(true); // chuyển lại online
