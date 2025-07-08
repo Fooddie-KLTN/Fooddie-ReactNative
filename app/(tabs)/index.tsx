@@ -229,6 +229,15 @@ export default function HomeScreen() {
         setModalVisible(false);
         setOnline(false); // chuyển trạng thái offline
         setOrderReceivedAt(null); // Clear the timestamp
+        
+        // ✅ NEW: Check if we're already posting position to backend
+        if (currentPosition && !locationIntervalRef.current) {
+          console.log('[🚚] Starting location posting for accepted order');
+          // The useEffect will handle starting the interval when newOrder is set
+        } else if (locationIntervalRef.current) {
+          console.log('[🚚] Already posting location to backend');
+        }
+        
         const { latitude, longitude } = newOrder.restaurant;
         if (latitude && longitude) {
           setDestination([parseFloat(longitude), parseFloat(latitude)]);
@@ -292,17 +301,17 @@ export default function HomeScreen() {
     }
   };
 
-  const handlePickup = () => {
+  const handlePickup = async () => { // ✅ Added async here
     setHasPickedUp(true);
 
     try {
-      const token = AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('token'); // ✅ Added await here
       if (!token) {
         Alert.alert('❌ Token không hợp lệ', 'Vui lòng đăng nhập lại.');
         return;
       }
 
-      fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/get-order`, {
+      await fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/get-order`, { // ✅ Added await here
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -311,14 +320,12 @@ export default function HomeScreen() {
         body: JSON.stringify({ orderId: newOrder.id }),
       });
 
-          Alert.alert('✅ Đã lấy món từ nhà hàng');
+      Alert.alert('✅ Đã lấy món từ nhà hàng');
 
     } catch (error) {
       console.error('Pickup error:', error);
       Alert.alert('❌ Lỗi', 'Đã xảy ra lỗi khi lấy món từ nhà hàng');
     }
-
-
 
     const lat = parseFloat(newOrder.address.latitude);
     const lon = parseFloat(newOrder.address.longitude);
@@ -362,16 +369,16 @@ export default function HomeScreen() {
   };
   
 
-  const handleCancelOrder = () => {
+  const handleCancelOrder = async () => { // ✅ Added async here
 
     try {
-      const token = AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('token'); // ✅ Added await here
       if (!token) {
         Alert.alert('❌ Token không hợp lệ', 'Vui lòng đăng nhập lại.');
         return;
       }
 
-      fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/cancel-order`, {
+      await fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/cancel-order`, { // ✅ Added await here
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -379,13 +386,10 @@ export default function HomeScreen() {
         },
         body: JSON.stringify({ orderId: newOrder.id }),
       });
-    Alert.alert('🚫 Huỷ đơn', 'Bạn đã huỷ đơn này');
+      
+      Alert.alert('🚫 Huỷ đơn', 'Bạn đã huỷ đơn này');
 
-
-
-
-    }
-    catch (error) {
+    } catch (error) {
       console.error('Cancel order error:', error);
       Alert.alert('❌ Lỗi', 'Đã xảy ra lỗi khi huỷ đơn hàng');
     }
