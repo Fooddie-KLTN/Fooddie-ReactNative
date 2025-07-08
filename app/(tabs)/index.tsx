@@ -30,13 +30,20 @@ export default function HomeScreen() {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [orderReceivedAt, setOrderReceivedAt] = useState<Date | null>(null);
 
+  // ✅ UPDATED: Demo simulation states
+  const [isDemoMode] = useState(true); // Set to true for demo
+  const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([]);
+  const [routeStepIndex, setRouteStepIndex] = useState(0);
+  const [isMovingToDestination, setIsMovingToDestination] = useState(false);
+
   const cameraRef = useRef<MapboxGL.Camera>(null);
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const locationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const locationSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
+  // ✅ NEW: Demo movement interval
+  const demoMovementRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
@@ -53,52 +60,57 @@ export default function HomeScreen() {
     ).start();
   }, []);
 
-  // ✅ NEW: Real-time location tracking
+  // ✅ UPDATED: Location tracking with demo mode (Quan 7 starting position)
   useEffect(() => {
     let isMounted = true;
 
     const initializeLocation = async () => {
       try {
-        // Request permissions
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
           console.warn('Permission to access location was denied');
           return;
         }
 
-        // Get initial location
-        const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        
-        if (isMounted) {
-          setCurrentPosition([
-            location.coords.longitude,
-            location.coords.latitude,
-          ]);
-        }
-
-        // Start watching location changes
-        const subscription = await Location.watchPositionAsync(
-          {
+        if (!isDemoMode) {
+          // Real GPS mode
+          const location = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Balanced,
-            timeInterval: 5000, // Update every 5 seconds
-            distanceInterval: 10, // Or when moved 10 meters
-          },
-          (newLocation) => {
-            if (isMounted) {
-              const newPos: [number, number] = [
-                newLocation.coords.longitude,
-                newLocation.coords.latitude,
-              ];
-              
-              console.log('[📍] Location updated:', newPos);
-              setCurrentPosition(newPos);
-            }
+          });
+          
+          if (isMounted) {
+            setCurrentPosition([
+              location.coords.longitude,
+              location.coords.latitude,
+            ]);
           }
-        );
 
-        locationSubscriptionRef.current = subscription;
+          const subscription = await Location.watchPositionAsync(
+            {
+              accuracy: Location.Accuracy.Balanced,
+              timeInterval: 2000,
+              distanceInterval: 5,
+            },
+            (newLocation) => {
+              if (isMounted) {
+                const newPos: [number, number] = [
+                  newLocation.coords.longitude,
+                  newLocation.coords.latitude,
+                ];
+                console.log('[📍] Real location updated:', newPos);
+                setCurrentPosition(newPos);
+              }
+            }
+          );
+          locationSubscriptionRef.current = subscription;
+        } else {
+          // ✅ UPDATED: Demo mode - set Quan 7 (District 7) as starting position
+          const quan7Position: [number, number] = [106.7244, 10.7285]; // Quan 7, HCM - Phu My Hung area
+          if (isMounted) {
+            setCurrentPosition(quan7Position);
+            console.log('[🎬] Demo starting position set to Quan 7, HCM:', quan7Position);
+          }
+        }
 
       } catch (error) {
         console.error('Error setting up location tracking:', error);
@@ -107,7 +119,6 @@ export default function HomeScreen() {
 
     initializeLocation();
 
-    // Cleanup function
     return () => {
       isMounted = false;
       if (locationSubscriptionRef.current) {
@@ -115,25 +126,116 @@ export default function HomeScreen() {
         locationSubscriptionRef.current = null;
       }
     };
-  }, []);
+  }, [isDemoMode]);
+
+  // ✅ UPDATED: Much quicker demo movement
+  useEffect(() => {
+    if (isDemoMode && isMovingToDestination && routeCoordinates.length > 0) {
+      // Clear any existing movement
+      if (demoMovementRef.current) {
+        clearInterval(demoMovementRef.current);
+      }
+      
+      demoMovementRef.current = setInterval(() => {
+        setRouteStepIndex(prevStep => {
+          const nextStep = prevStep + 1;
+          
+          if (nextStep >= routeCoordinates.length) {
+            // Reached destination
+            setIsMovingToDestination(false);
+            
+            // Show arrival notification
+            if (hasPickedUp) {
+              setTimeout(() => {
+                Alert.alert('🎯 Đã đến nơi!', 'Bạn đã đến địa chỉ giao hàng. Hãy hoàn thành đơn hàng.');
+              }, 500);
+            } else {
+              setTimeout(() => {
+                Alert.alert('🏪 Đã đến nhà hàng!', 'Bạn đã đến nhà hàng. Hãy lấy món ăn.');
+              }, 500);
+            }
+            
+            return prevStep; // Stop at last position
+          }
+          
+          // Move to next position along route
+          const newPosition = routeCoordinates[nextStep];
+          setCurrentPosition(newPosition);
+          
+          // Auto-center camera on moving position
+          if (cameraRef.current) {
+            cameraRef.current.flyTo(newPosition, 1000); // Quicker camera movement
+          }
+          
+          return nextStep;
+        });
+      }, 800); // ✅ CHANGED: Update every 1.5 seconds (much quicker)
+    }
+
+    return () => {
+      if (demoMovementRef.current) {
+        clearInterval(demoMovementRef.current);
+        demoMovementRef.current = null;
+      }
+    };
+  }, [isDemoMode, isMovingToDestination, routeCoordinates, hasPickedUp]);
+
+  // ✅ UPDATED: Create smaller 30-meter steps for quicker but smoother movement
+  useEffect(() => {
+    const fetchRoute = async () => {
+      if (!currentPosition || !destination) return;
+
+      const token = Constants.expoConfig?.extra?.MAPBOX_ACCESS_TOKEN;
+      // Add steps=true for more detailed route points
+      const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${currentPosition.join(',')};${destination.join(',')}?geometries=geojson&steps=true&access_token=${token}`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        const coords = data.routes[0]?.geometry;
+        
+        if (coords) {
+          setRoute({ type: 'Feature', properties: {}, geometry: coords });
+          
+          if (isDemoMode && coords.coordinates) {
+            const routePoints = coords.coordinates;
+            
+            // ✅ CHANGED: Create 30-meter steps for quicker movement
+            const detailedPoints = createDetailedSteps(routePoints, 250); // 30 meter steps
+            setRouteCoordinates(detailedPoints);
+            setRouteStepIndex(0);
+            
+
+            
+            // Start movement automatically when route is ready
+            setTimeout(() => {
+              setIsMovingToDestination(true);
+            }, 1000);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch route:', err);
+      }
+    };
+
+    fetchRoute();
+  }, [currentPosition, destination, isDemoMode]);
 
   // ✅ UPDATED: Send location to server when delivering
   useEffect(() => {
-    console.log('[DEBUG] useEffect locationInterval: newOrder =', newOrder, ', currentPosition =', currentPosition);
+    //console.log('[DEBUG] useEffect locationInterval: newOrder =', newOrder, ', currentPosition =', currentPosition);
 
-    // Clear any existing interval
     if (locationIntervalRef.current) {
       clearInterval(locationIntervalRef.current);
       locationIntervalRef.current = null;
     }
 
-    // Start interval only when there's an active order
     if (newOrder && currentPosition) {
       locationIntervalRef.current = setInterval(async () => {
         try {
           const [longitude, latitude] = currentPosition;
           
-          console.log('[🚚] Posting location to BE:', { latitude, longitude });
+          //console.log('[🚚] Posting location to BE:', { latitude, longitude });
           
           const token = await AsyncStorage.getItem('token');
           await fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/update-location`, {
@@ -145,19 +247,18 @@ export default function HomeScreen() {
             body: JSON.stringify({ latitude, longitude }),
           });
         } catch (err) {
-          console.warn('[🚚] Failed to update location:', err);
+          //console.warn('[🚚] Failed to update location:', err);
         }
-      }, 10000); // Send to server every 10 seconds
+      }, 10000);
     }
 
-    // Cleanup function
     return () => {
       if (locationIntervalRef.current) {
         clearInterval(locationIntervalRef.current);
         locationIntervalRef.current = null;
       }
     };
-  }, [newOrder, currentPosition]); // Added currentPosition as dependency
+  }, [newOrder, currentPosition]);
 
   const { newOrders } = useOrderConfirmedForShipper({
     latitude: currentPosition?.[1]?.toString() || '',
@@ -169,32 +270,9 @@ export default function HomeScreen() {
       console.log('[📦] New Order:', newOrders[0]); 
       setNewOrder(newOrders[0]);  
       setModalVisible(true);
-      setOrderReceivedAt(new Date()); // Track when order was received
+      setOrderReceivedAt(new Date());
     }
   }, [newOrders]); 
-
-  useEffect(() => {
-    const fetchRoute = async () => {
-      if (!currentPosition || !destination) return;
-  
-      const token = Constants.expoConfig?.extra?.MAPBOX_ACCESS_TOKEN;
-      const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${currentPosition.join(',')};${destination.join(',')}?geometries=geojson&access_token=${token}`;
-  
-      try {
-        const res = await fetch(url);
-        const data = await res.json();
-        const coords = data.routes[0]?.geometry;
-        if (coords) {
-          setRoute({ type: 'Feature', properties: {}, geometry: coords });
-        }
-      } catch (err) {
-        console.warn('Failed to fetch route:', err);
-      }
-    };
-  
-    fetchRoute();
-  }, [currentPosition, destination]);
-  
 
   const handleAcceptOrder = async () => {
     try {
@@ -204,7 +282,6 @@ export default function HomeScreen() {
         return;
       }
 
-      // Calculate actual response time
       const responseTimeSeconds = orderReceivedAt 
         ? Math.floor((new Date().getTime() - orderReceivedAt.getTime()) / 1000)
         : 30;
@@ -227,11 +304,14 @@ export default function HomeScreen() {
 
       if (res.ok) {
         setModalVisible(false);
-        setOnline(false); // chuyển trạng thái offline
-        setOrderReceivedAt(null); // Clear the timestamp
+        setOnline(false);
+        setOrderReceivedAt(null);
+        
         const { latitude, longitude } = newOrder.restaurant;
         if (latitude && longitude) {
-          setDestination([parseFloat(longitude), parseFloat(latitude)]);
+          const restaurantDestination: [number, number] = [parseFloat(longitude), parseFloat(latitude)];
+          setDestination(restaurantDestination);
+          console.log('[🎬] Demo: Setting destination to restaurant:', restaurantDestination);
         }
       } else {
         Alert.alert('❌ Lỗi', result.message || 'Không thể nhận đơn');
@@ -250,7 +330,6 @@ export default function HomeScreen() {
         return;
       }
 
-      // Calculate actual response time
       const responseTimeSeconds = orderReceivedAt 
         ? Math.floor((new Date().getTime() - orderReceivedAt.getTime()) / 1000)
         : 30;
@@ -260,7 +339,7 @@ export default function HomeScreen() {
       const res = await fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/reject-order`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
@@ -277,7 +356,6 @@ export default function HomeScreen() {
         setNewOrder(null);
         setOrderReceivedAt(null);
         
-        // Show warning if present in response
         if (result.warning) {
           setTimeout(() => {
             Alert.alert('⚠️ Cảnh báo', result.warning);
@@ -292,38 +370,53 @@ export default function HomeScreen() {
     }
   };
 
-  const handlePickup = () => {
+  const handlePickup = async () => { // ✅ Make function async
     setHasPickedUp(true);
+    setIsMovingToDestination(false); // Stop current movement
 
     try {
-      const token = AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('token'); // ✅ Add await
       if (!token) {
         Alert.alert('❌ Token không hợp lệ', 'Vui lòng đăng nhập lại.');
         return;
       }
 
-      fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/get-order`, {
+      console.log('Token: ', token);
+
+      const response = await fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/get-order`, { // ✅ Add await
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${token}`, // ✅ Add Bearer prefix
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ orderId: newOrder.id }),
       });
 
-          Alert.alert('✅ Đã lấy món từ nhà hàng');
+      const result = await response.json(); // ✅ Handle response
+
+      if (response.ok) {
+        Alert.alert('✅ Đã lấy món từ nhà hàng');
+      } else {
+        Alert.alert('❌ Lỗi', result.message || 'Không thể lấy món từ nhà hàng');
+      }
 
     } catch (error) {
       console.error('Pickup error:', error);
       Alert.alert('❌ Lỗi', 'Đã xảy ra lỗi khi lấy món từ nhà hàng');
     }
 
-
-
+    // ✅ NEW: Switch to delivery address in demo mode
     const lat = parseFloat(newOrder.address.latitude);
     const lon = parseFloat(newOrder.address.longitude);
     if (!isNaN(lat) && !isNaN(lon)) {
-      setDestination([lon, lat]); // chuyển sang chỉ đường đến địa chỉ giao hàng
+      const deliveryDestination: [number, number] = [lon, lat];
+      setDestination(deliveryDestination);
+      console.log('[🎬] Demo: Switching to delivery destination:', deliveryDestination);
+      
+      // Reset route for new destination
+      setTimeout(() => {
+        setRouteStepIndex(0);
+      }, 1000);
     }
   };
 
@@ -348,10 +441,17 @@ export default function HomeScreen() {
   
       if (res.ok) {
         Alert.alert('✅ Đơn hoàn thành', 'Bạn đã giao đơn thành công!');
+        
+        // ✅ Reset demo state
         setNewOrder(null);
         setRoute(null);
         setHasPickedUp(false);
-        setOnline(true); // Cho phép nhận đơn tiếp theo
+        setOnline(true);
+        setIsMovingToDestination(false);
+        setRouteCoordinates([]);
+        setRouteStepIndex(0);
+        setDestination(null);
+        
       } else {
         Alert.alert('❌ Lỗi', result.message || 'Không thể hoàn thành đơn hàng');
       }
@@ -360,39 +460,45 @@ export default function HomeScreen() {
       Alert.alert('❌ Lỗi', 'Đã xảy ra lỗi khi hoàn thành đơn hàng');
     }
   };
-  
 
-  const handleCancelOrder = () => {
-
+  const handleCancelOrder = async () => {
     try {
-      const token = AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('token'); // ✅ Add await
       if (!token) {
         Alert.alert('❌ Token không hợp lệ', 'Vui lòng đăng nhập lại.');
         return;
       }
 
-      fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/cancel-order`, {
+      const response = await fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/cancel-order`, { // ✅ Add await
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${token}`, // ✅ Add Bearer prefix
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ orderId: newOrder.id }),
       });
-    Alert.alert('🚫 Huỷ đơn', 'Bạn đã huỷ đơn này');
 
+      const result = await response.json(); // ✅ Handle response
 
+      if (response.ok) {
+        Alert.alert('🚫 Huỷ đơn', 'Bạn đã huỷ đơn này');
+      } else {
+        Alert.alert('❌ Lỗi', result.message || 'Không thể huỷ đơn hàng');
+      }
 
-
-    }
-    catch (error) {
+    } catch (error) {
       console.error('Cancel order error:', error);
       Alert.alert('❌ Lỗi', 'Đã xảy ra lỗi khi huỷ đơn hàng');
     }
 
+    // ✅ Reset demo state
     setNewOrder(null);
     setRoute(null);
-    setOnline(true); // chuyển lại online
+    setOnline(true);
+    setIsMovingToDestination(false);
+    setRouteCoordinates([]);
+    setRouteStepIndex(0);
+    setDestination(null);
   };
 
   const fullAddress = [
@@ -470,7 +576,6 @@ export default function HomeScreen() {
             </MapboxGL.PointAnnotation>
           )}
 
-
           {route && route?.type === 'Feature' && (
             <MapboxGL.ShapeSource id="routeSource" shape={route}>
               <MapboxGL.LineLayer
@@ -481,8 +586,6 @@ export default function HomeScreen() {
           )}
         </MapboxGL.MapView>
       )}
-
-      
 
       {/* Nút quay lại vị trí hiện tại */}
       {currentPosition && (
@@ -754,19 +857,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#F3C871', // màu đậm hơn
+    backgroundColor: '#F3C871',
   },
   logo: {
-    width: 140, // logo to hơn
+    width: 140,
     height: 60,
     resizeMode: 'contain',
   },
   statusBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    flexDirection: 'row', // ✅ Add missing flexDirection
+    alignItems: 'center', // ✅ Add missing alignItems
+    gap: 8, // ✅ Add missing gap
   },
-  statusDot: {
+  statusDot: { // ✅ Add missing statusDot styles
     width: 10,
     height: 10,
     borderRadius: 5,
@@ -809,14 +912,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 20,
-    maxHeight: '80%', // ✅ Giới hạn chiều cao để cuộn được
+    maxHeight: '80%',
     shadowColor: '#000',
     shadowOpacity: 0.15,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 10,
     elevation: 6,
   },
-  
   modalHeader: {
     backgroundColor: '#F3C871',
     borderRadius: 12,
@@ -864,7 +966,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   btnText: {
-    color: '#fff', // hoặc màu nền tương phản
+    color: '#fff',
     fontWeight: '700',
     fontSize: 15,
     textAlign: 'center'
@@ -900,3 +1002,56 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
 });
+
+// ✅ NEW: Function to create detailed steps between points
+const createDetailedSteps = (coordinates: [number, number][], targetStepSize: number): [number, number][] => {
+  if (coordinates.length < 2) return coordinates;
+  
+  const result: [number, number][] = [coordinates[0]]; // Start with first point
+  
+  for (let i = 1; i < coordinates.length; i++) {
+    const startPoint = coordinates[i - 1];
+    const endPoint = coordinates[i];
+    
+    // Calculate distance between consecutive points
+    const distance = calculateDistance(startPoint, endPoint);
+    
+    // If distance is larger than target, create intermediate points
+    if (distance > targetStepSize) {
+      const numSteps = Math.ceil(distance / targetStepSize);
+      
+      for (let step = 1; step <= numSteps; step++) {
+        const ratio = step / numSteps;
+        const interpolatedPoint: [number, number] = [
+          startPoint[0] + (endPoint[0] - startPoint[0]) * ratio,
+          startPoint[1] + (endPoint[1] - startPoint[1]) * ratio
+        ];
+        result.push(interpolatedPoint);
+      }
+    } else {
+      // Distance is small enough, just add the end point
+      result.push(endPoint);
+    }
+  }
+  
+  return result;
+};
+
+// ✅ NEW: Distance calculation function (Haversine formula)
+const calculateDistance = (coord1: [number, number], coord2: [number, number]): number => {
+  const [lon1, lat1] = coord1;
+  const [lon2, lat2] = coord2;
+  
+  const R = 6371000; // Earth's radius in meters
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ/2) * Math.sin(Δλ/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+  return R * c; // Distance in meters
+};
