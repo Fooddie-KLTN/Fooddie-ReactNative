@@ -33,6 +33,7 @@ export default function HomeScreen() {
   const cameraRef = useRef<MapboxGL.Camera>(null);
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const locationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const locationSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
 
   useEffect(() => {
     
@@ -52,44 +53,89 @@ export default function HomeScreen() {
     ).start();
   }, []);
 
+  // ✅ NEW: Real-time location tracking
   useEffect(() => {
-    const getLocation = async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        console.warn('Permission to access location was denied');
-        return;
-      }
+    let isMounted = true;
 
-      const location = await Location.getCurrentPositionAsync({});
-      setCurrentPosition([
-        location.coords.longitude,
-        location.coords.latitude,
-      ]);
-      //setCurrentPosition([106.660172, 10.762622]);
+    const initializeLocation = async () => {
+      try {
+        // Request permissions
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          console.warn('Permission to access location was denied');
+          return;
+        }
+
+        // Get initial location
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        
+        if (isMounted) {
+          setCurrentPosition([
+            location.coords.longitude,
+            location.coords.latitude,
+          ]);
+        }
+
+        // Start watching location changes
+        const subscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            timeInterval: 5000, // Update every 5 seconds
+            distanceInterval: 10, // Or when moved 10 meters
+          },
+          (newLocation) => {
+            if (isMounted) {
+              const newPos: [number, number] = [
+                newLocation.coords.longitude,
+                newLocation.coords.latitude,
+              ];
+              
+              console.log('[📍] Location updated:', newPos);
+              setCurrentPosition(newPos);
+            }
+          }
+        );
+
+        locationSubscriptionRef.current = subscription;
+
+      } catch (error) {
+        console.error('Error setting up location tracking:', error);
+      }
     };
 
-    getLocation();
+    initializeLocation();
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      if (locationSubscriptionRef.current) {
+        locationSubscriptionRef.current.remove();
+        locationSubscriptionRef.current = null;
+      }
+    };
   }, []);
 
-
+  // ✅ UPDATED: Send location to server when delivering
   useEffect(() => {
-  console.log('[DEBUG] useEffect locationInterval: newOrder =', newOrder, ', hasPickedUp =', hasPickedUp, ', currentPosition =', currentPosition);
+    console.log('[DEBUG] useEffect locationInterval: newOrder =', newOrder, ', currentPosition =', currentPosition);
 
-  // Start interval only when delivering (hasPickedUp) and there is a newOrder
-  if (newOrder) {
-    if (locationIntervalRef.current) clearInterval(locationIntervalRef.current);
+    // Clear any existing interval
+    if (locationIntervalRef.current) {
+      clearInterval(locationIntervalRef.current);
+      locationIntervalRef.current = null;
+    }
 
-    locationIntervalRef.current = setInterval(async () => {
-      try {
-        // Use real location if needed, here using currentPosition state
-        const latitude = currentPosition?.[1];
-        const longitude = currentPosition?.[0];
-
-        console.log('[DEBUG] Interval tick: latitude =', latitude, ', longitude =', longitude);
-
-        if (latitude && longitude) {
-          const token = await AsyncStorage.getItem('token');
+    // Start interval only when there's an active order
+    if (newOrder && currentPosition) {
+      locationIntervalRef.current = setInterval(async () => {
+        try {
+          const [longitude, latitude] = currentPosition;
+          
           console.log('[🚚] Posting location to BE:', { latitude, longitude });
+          
+          const token = await AsyncStorage.getItem('token');
           await fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/update-location`, {
             method: 'POST',
             headers: {
@@ -98,31 +144,20 @@ export default function HomeScreen() {
             },
             body: JSON.stringify({ latitude, longitude }),
           });
-        } else {
-          console.log('[🚚] Skipped posting location: missing coordinates');
+        } catch (err) {
+          console.warn('[🚚] Failed to update location:', err);
         }
-      } catch (err) {
-        console.warn('[🚚] Failed to update location:', err);
-      }
-    }, 5000);
-  } else {
-    console.log('[DEBUG] Not starting locationInterval: hasPickedUp is false');
-    if (locationIntervalRef.current) {
-      clearInterval(locationIntervalRef.current);
-      locationIntervalRef.current = null;
-      console.log('[DEBUG] Cleared locationInterval');
+      }, 10000); // Send to server every 10 seconds
     }
-  }
 
-  // Cleanup on unmount or when dependencies change
-  return () => {
-    if (locationIntervalRef.current) {
-      clearInterval(locationIntervalRef.current);
-      locationIntervalRef.current = null;
-      console.log('[DEBUG] Cleanup: Cleared locationInterval');
-    }
-  };
-}, [newOrder, hasPickedUp, currentPosition]);
+    // Cleanup function
+    return () => {
+      if (locationIntervalRef.current) {
+        clearInterval(locationIntervalRef.current);
+        locationIntervalRef.current = null;
+      }
+    };
+  }, [newOrder, currentPosition]); // Added currentPosition as dependency
 
   const { newOrders } = useOrderConfirmedForShipper({
     latitude: currentPosition?.[1]?.toString() || '',
