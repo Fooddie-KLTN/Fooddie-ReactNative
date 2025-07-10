@@ -6,6 +6,7 @@ export default {
     slug: 'Fooddie',
     version: '1.0.0',
     orientation: 'portrait',
+    owner: "ducquan",
     icon: './assets/images/icon.png',
     scheme: 'myapp',
     userInterfaceStyle: 'automatic',
@@ -47,8 +48,8 @@ export default {
       router: {
         origin: false
       },
-      eas: {
-        projectId: 'bf2aa5cd-75cc-4114-805b-c4898033206a'
+       eas: {
+        projectId: "38f3c1bb-f78e-40b5-8c8f-ae0fe2c601cc"
       }
     }
   }
