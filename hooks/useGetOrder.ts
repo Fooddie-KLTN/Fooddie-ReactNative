@@ -106,9 +106,9 @@ function haversineDistance(
       }
     }, [enable]);
 
-    console.log('[📍 useOrderConfirmedForShipper] Location:', location);
-    console.log('[🚦 useOrderConfirmedForShipper] Enabled:', enable);
-    console.log('[👤 useOrderConfirmedForShipper] ShipperId:', shipperId);
+    // console.log('[📍 useOrderConfirmedForShipper] Location:', location);
+    // console.log('[🚦 useOrderConfirmedForShipper] Enabled:', enable);
+    // console.log('[👤 useOrderConfirmedForShipper] ShipperId:', shipperId);
 
     const { loading, error } = useSubscription(ORDER_CONFIRMED_FOR_SHIPPERS, {
       variables: {
@@ -122,9 +122,9 @@ function haversineDistance(
         console.log('[📡 Subscription Triggered] Raw data:', data);
 
         const newOrder = data?.data?.orderConfirmedForShippers;
-        console.log('[📦 Order received]', newOrder?.address);
-        console.log('[📍 Lat/Lng]', newOrder?.address.latitude, newOrder?.address.longitude);
-        console.log('[💰 Earnings Info]', newOrder?.deliveryMetadata?.shippingInfo?.financialSummary);
+        // console.log('[📦 Order received]', newOrder?.address);
+        // console.log('[📍 Lat/Lng]', newOrder?.address.latitude, newOrder?.address.longitude);
+        // console.log('[💰 Earnings Info]', newOrder?.deliveryMetadata?.shippingInfo?.financialSummary);
 
         if (newOrder) {
           const orderLat = parseFloat(newOrder.address.latitude);

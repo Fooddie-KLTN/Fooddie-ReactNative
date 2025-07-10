@@ -162,6 +162,28 @@ export default function HomeScreen() {
           const newPosition = routeCoordinates[nextStep];
           setCurrentPosition(newPosition);
           
+          // ✅ NEW: Post location to backend IMMEDIATELY on each demo step
+          if (newOrder) {
+            const [longitude, latitude] = newPosition;
+            console.log('[🎬] Demo step: Posting location to BE:', { latitude, longitude });
+            
+            // Post to backend immediately
+            AsyncStorage.getItem('token').then(token => {
+              if (token) {
+                fetch(`${Constants.expoConfig?.extra?.apiUrl}/shippers/update-location`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ latitude, longitude }),
+                }).catch(err => {
+                  console.warn('[🎬] Demo: Failed to update location:', err);
+                });
+              }
+            });
+          }
+          
           // Auto-center camera on moving position
           if (cameraRef.current) {
             cameraRef.current.flyTo(newPosition, 1000); // Quicker camera movement
@@ -169,7 +191,7 @@ export default function HomeScreen() {
           
           return nextStep;
         });
-      }, 800); // ✅ CHANGED: Update every 1.5 seconds (much quicker)
+      }, 800); // ✅ Update every 800ms with location posting
     }
 
     return () => {
@@ -178,7 +200,7 @@ export default function HomeScreen() {
         demoMovementRef.current = null;
       }
     };
-  }, [isDemoMode, isMovingToDestination, routeCoordinates, hasPickedUp]);
+  }, [isDemoMode, isMovingToDestination, routeCoordinates, hasPickedUp, newOrder]);
 
   // ✅ UPDATED: Create smaller 30-meter steps for quicker but smoother movement
   useEffect(() => {
