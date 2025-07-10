@@ -10,6 +10,7 @@ import {
   Alert,
   Animated,
   ScrollView,
+  Linking,
 } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import Constants from 'expo-constants';
@@ -662,23 +663,50 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </>
             ) : (
-              <TouchableOpacity
-                onPress={handleCompleteOrder}
-                style={{ flex: 1, backgroundColor: '#4CAF50', padding: 10, borderRadius: 8 }}
-              >
-                <Text style={{ textAlign: 'center', color: '#fff', fontWeight: 'bold' }}>Hoàn thành</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  onPress={handleCompleteOrder}
+                  style={{ flex: 1, backgroundColor: '#4CAF50', padding: 10, borderRadius: 8 }}
+                >
+                  <Text style={{ textAlign: 'center', color: '#fff', fontWeight: 'bold' }}>Hoàn thành</Text>
+                </TouchableOpacity>
+                
+                {/* ✅ Call customer button using Linking */}
+                <TouchableOpacity
+                  onPress={() => {
+                    if (newOrder?.customer?.phoneNumber) {
+                      const phoneNumber = newOrder.customer.phoneNumber;
+                      const phoneUrl = `tel:${phoneNumber}`;
+                      
+                      console.log('[📞] Calling customer:', phoneNumber);
+                      
+                      Linking.openURL(phoneUrl).catch(err => {
+                        console.error('Failed to make phone call:', err);
+                        Alert.alert('❌ Lỗi', 'Không thể thực hiện cuộc gọi');
+                      });
+                    } else {
+                      Alert.alert('❌ Lỗi', 'Không có số điện thoại khách hàng');
+                    }
+                  }}
+                  style={{ flex: 1, backgroundColor: '#2196F3', padding: 10, borderRadius: 8 }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                    <MaterialIcons name="phone" size={16} color="#fff" />
+                    <Text style={{ textAlign: 'center', color: '#fff', fontWeight: 'bold', marginLeft: 4 }}>
+                      Gọi KH
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </>
             )}
 
-              <TouchableOpacity
-                onPress={() => setDetailModalVisible(true)}
-                style={{ flex: 1, backgroundColor: '#2196F3', padding: 10, borderRadius: 8 }}
-              >
-                <Text style={{ textAlign: 'center', color: '#fff', fontWeight: 'bold' }}>Chi tiết món</Text>
-              </TouchableOpacity>
-
+            <TouchableOpacity
+              onPress={() => setDetailModalVisible(true)}
+              style={{ flex: 1, backgroundColor: '#2196F3', padding: 10, borderRadius: 8 }}
+            >
+              <Text style={{ textAlign: 'center', color: '#fff', fontWeight: 'bold' }}>Chi tiết món</Text>
+            </TouchableOpacity>
           </View>
-
         </View>
       )}
 
