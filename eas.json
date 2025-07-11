@@ -9,27 +9,16 @@
         "buildType": "apk"
       },
       "env": {
-        "NEXT_PUBLIC_API_URL": "https://fooddie-be.onrender.com",
-        "NEXT_PUBLIC_API_URL_DOMAIN_BE": "fooddie-be.onrender.com",
-        "NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN": "sk.eyJ1IjoiZHVjcXVhbjExMDYiLCJhIjoiY21iMGkyd2Q3MGx5cTJpczdmZjVleTBxMiJ9.CRPKC7053v7cwMmJC62cmQ"
+        "EXPO_PUBLIC_API_URL": "https://fooddie-be.onrender.com",
+        "EXPO_PUBLIC_API_URL_DOMAIN_BE": "fooddie-be.onrender.com",
+        "EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN": "sk.eyJ1IjoiZHVjcXVhbjExMDYiLCJhIjoiY21iMGkyd2Q3MGx5cTJpczdmZjVleTBxMiJ9.CRPKC7053v7cwMmJC62cmQ"
       }
-    },
-    "preview2": {
-      "android": {
-        "gradleCommand": ":app:assembleRelease"
-      }
-    },
-    "preview3": {
-      "developmentClient": true
-    },
-    "preview4": {
-      "distribution": "internal"
     },
     "production": {
       "env": {
-        "NEXT_PUBLIC_API_URL": "https://fooddie-be.onrender.com",
-        "NEXT_PUBLIC_API_URL_DOMAIN_BE": "fooddie-be.onrender.com",
-        "NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN": "sk.eyJ1IjoiZHVjcXVhbjExMDYiLCJhIjoiY21iMGkyd2Q3MGx5cTJpczdmZjVleTBxMiJ9.CRPKC7053v7cwMmJC62cmQ"
+        "EXPO_PUBLIC_API_URL": "https://fooddie-be.onrender.com",
+        "EXPO_PUBLIC_API_URL_DOMAIN_BE": "fooddie-be.onrender.com",
+        "EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN": "sk.eyJ1IjoiZHVjcXVhbjExMDYiLCJhIjoiY21iMGkyd2Q3MGx5cTJpczdmZjVleTBxMiJ9.CRPKC7053v7cwMmJC62cmQ"
       }
     }
   },

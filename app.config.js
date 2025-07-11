@@ -42,9 +42,9 @@ export default {
       typedRoutes: true
     },
     extra: {
-      apiUrl: process.env.NEXT_PUBLIC_API_URL,
-      baseUrl: process.env.NEXT_PUBLIC_API_URL_DOMAIN_BE,
-      MAPBOX_ACCESS_TOKEN: process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN,
+      apiUrl: process.env.EXPO_PUBLIC_API_URL,
+      baseUrl: process.env.EXPO_PUBLIC_API_URL_DOMAIN_BE,
+      MAPBOX_ACCESS_TOKEN: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN,
       router: {
         origin: false
       },
